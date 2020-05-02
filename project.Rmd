@@ -1,0 +1,300 @@
+---
+title: "Project"
+author: "Team"
+date: "4/19/2020"
+output: html_document
+---
+# Semester Project: AD699
+
+## Step I: Data Preparation & Exploration (15 points)
+Read your data into your local environment, and subset/filter the data so that you are dealing only with the records that pertain to your team’s neighborhood group. If you use read_csv() you will be reading the dataset in with Unicode -- this may help out with the rendering of some of the German-specific characters.
+```{r}
+library(dplyr)
+library(tidyverse)
+```
+
+```{r}
+listings_summary = read.csv("listings_summary.csv",na.strings=c("","none","N/A"),stringsAsFactors = F)
+PB_data = listings_summary[listings_summary$neighbourhood == "Prenzlauer Berg",]
+dim(PB_data)
+head(PB_data)
+```
+
+```{r}
+View(PB_data)
+```
+
+```{r}
+# select the meaningless variables
+# scrape_id
+nomeaning = c("listing_url","scrape_id","space",
+              "thumbnail_url","medium_url","picture_url","xl_picture_url","host_url","host_thumbnail_url","host_picture_url")
+PB = select(PB_data,-nomeaning)
+View(PB)
+```
+
+
+
+### I. Missing Values
+#### A. Does your data contain any missing values and/or blank cells? If so, what can you do about this? Show the R code that you used to handle your missing values.
+
+```{r}
+str(PB)
+summary(PB)
+```
+
+```{r}
+# delete 1131 rows 
+missrows = PB[is.na(PB$id) == T,]
+sum(!is.na(missrows))
+PB_2 = PB[is.na(PB$id) == F,]
+View(PB_2)
+```
+
+```{r}
+# impute other missing values
+summary(PB_2)
+# calculate the percentage of missing value
+map(PB_2,~(sum(is.na(.))/nrow(PB_2)))
+PB_3 = PB_2 
+
+
+allNAcol = c("experiences_offered","host_acceptance_rate", "jurisdiction_names")
+PB_3 = select(PB_3,-allNAcol)
+# find mode in dataset
+FindMode <- function(x) {
+    ux <- unique(x)
+    ux[which.max(tabulate(match(x, ux)))]
+}
+
+
+# host_location mode value is "Berlin, Berlin, Germany" 
+PB_3$host_location[is.na(PB_3$host_location)] <- FindMode(PB_3$host_location)
+
+
+# transform missing value to "N/A"(not available). create a level for null value
+# host_response_time N/A
+PB_3$host_response_time[is.na(PB_3$host_response_time)] <- "N/A"
+
+# host_response_rate {high: host_response_rate >= 80%}, {low: host_response_rate < 80%}, {N/A: not available}
+PB_3$host_response_rate <- as.numeric(sub("%","",PB_3$host_response_rate))/100
+summary(as.factor(PB_3$host_response_rate))
+PB_3$host_response_rate[PB_3$host_response_rate>= 0.8] <- "high"
+PB_3$host_response_rate[PB_3$host_response_rate< 0.8] <- "low"
+PB_3$host_response_rate[is.na(PB_3$host_response_rate)] <- "N/A"
+summary(as.factor(PB_3$host_response_rate))
+
+# host_is_superhost NA => f
+PB_3$host_is_superhost[is.na(PB_3$host_is_superhost)] <- "f"
+
+# host_neighbourhood {Prenzlauer Berg}, {Other}, {NA => Prenzlauer Berg}
+PB_3$host_neighbourhood[PB_3$host_neighbourhood != "Prenzlauer Berg"] <- "Other"
+PB_3$host_neighbourhood[is.na(PB_3$host_neighbourhood)] <- "N/A"
+summary(as.factor(PB_3$host_neighbourhood))
+
+
+# host_listings_count  NA=>  mode
+
+PB_3$host_listings_count[is.na(PB_3$host_listings_count)] <-  FindMode(PB_3$host_listings_count)
+summary(as.factor(PB_3$host_listings_count))
+
+# host_total_listings_count mode
+PB_3$host_total_listings_count[is.na(PB_3$host_total_listings_count)] <-  FindMode(PB_3$host_total_listings_count)
+summary(as.factor(PB_3$host_total_listings_count))
+
+
+# host_has_profile_pic mode
+PB_3$host_has_profile_pic[is.na(PB_3$host_has_profile_pic)] <-  FindMode(PB_3$host_has_profile_pic)
+summary(as.factor(PB_3$host_has_profile_pic))
+
+
+
+# host_identity_verified mode
+PB_3$host_identity_verified[is.na(PB_3$host_identity_verified)] <-  FindMode(PB_3$host_identity_verified)
+summary(as.factor(PB_3$host_identity_verified))
+
+
+
+# city, state, zipcode
+summary(as.factor(PB_3$city))  
+PB_3$city = "Berlin"           # All city should be Berlin
+summary(as.factor(PB_3$state))  
+PB_3$state = "Berlin"           # All state should be Berlin
+
+summary(as.factor(PB_3$zipcode))  
+PB_3$zipcode[PB_3$zipcode == "10119\n10119"] = "10119" # data cleaning
+PB_3$zipcode[is.na(PB_3$zipcode)] <- "N/A"            
+
+# smart_location,street
+summary(as.factor(PB_3$smart_location))  
+PB_3$smart_location = "Berlin, Germany"           # All smart location should be "Berlin, Germany"
+
+summary(as.factor(PB_3$street))  
+PB_3$street = "Berlin, Germany"           # All smart location should be "Berlin, Germany"
+
+
+
+# market
+summary(as.factor(PB_3$market))  
+PB_3$market[is.na(PB_3$market)] <-  FindMode(PB_3$market)
+
+
+# bathrooms, bedrooms, beds NA => mode
+summary(as.factor(PB_3$bathrooms))  
+PB_3$bathrooms[is.na(PB_3$bathrooms)] <-  FindMode(PB_3$bathrooms)
+
+summary(as.factor(PB_3$bedrooms))  
+PB_3$bedrooms[is.na(PB_3$bedrooms)] <-  FindMode(PB_3$bedrooms)
+
+summary(as.factor(PB_3$beds))  
+PB_3$beds[is.na(PB_3$beds)] <-  FindMode(PB_3$beds)
+
+# license
+summary(as.factor(PB_3$license))  
+PB_3$license[which(is.na(PB_3$license)==F)] = "Yes"
+PB_3$license[which(is.na(PB_3$license)==T)] = "No"
+
+# Extract year and month.   first_review      last_review    host_since
+PB_3$first_review = substring(PB_3$first_review,1,4)
+PB_3$last_review = substring(PB_3$last_review,1,4)
+PB_3$host_since = substring(PB_3$host_since,1,4)
+PB_3$first_review[is.na(PB_3$first_review)] <- "N/A"            
+PB_3$last_review[is.na(PB_3$last_review)] <- "N/A"            
+PB_3$host_since[is.na(PB_3$host_since)] <- "N/A"  
+PB_3$first_review = as.character(PB_3$first_review)
+PB_3$last_review = as.character(PB_3$last_review)
+PB_3$host_since = as.character(PB_3$host_since)
+
+# 
+dollar_cols = c("price","weekly_price","monthly_price","security_deposit","cleaning_fee","extra_people")
+for(i in dollar_cols){
+    PB_3[i] = sub("^.","",as.vector(t(PB_3[i])))
+   PB_3[i] = as.numeric(sub(",","",as.vector(t(PB_3[i]))))
+}
+
+
+for(i in 1:ncol(PB_3)){
+    if (mode(PB_3[,i]) == "character"){
+        PB_3[,i] = as.factor(PB_3[,i])
+    }
+}
+summary(PB_3) 
+```
+
+
+
+#### B. Write one paragraph describing what you did, and why you did it. (Note: You may wish to deal with missing values differently for different tasks. You are not ‘locked in’ to a decision regarding missing values).
+```{r}
+
+```
+
+
+
+
+### II. Summary Statistics
+#### A. Take a peek at your data, and then brainstorm a bit about some questions that you’d like to answer with summary statistics. To answer these questions choose any five of the summary statistics functions shown in the textbook, class slides, or anywhere else to learn a little bit about your data set.
+```{r}
+str(PB)
+```
+
+
+
+
+#### B. Show screenshots of the results. Describe your findings in 1-2 paragraphs.
+
+
+
+
+
+
+
+
+
+
+
+### III. Data Visualization
+#### A. Using ggplot, create any five plots that help to describe your data. As you do, remember to think about the types of variables that you are representing with a particular plot. Think of these plots a sexpository(notexploratory)so be sure to include clear axis labels and plot titles.
+    
+#### B. Write a two-paragraph description that explains the choices that you made, and what the resulting plots show.
+
+
+### IV. Mapping
+#### A. Generate a map that depicts the location of the properties in the dataset that are in your neighborhood. On this map, show the various property types using different colors. Do the property types appear to be geographically clustered at all, or are they dispersed in a mostly even way throughout?
+
+### V. Wordcloud
+#### A. Using the neighborhood overview column in your dataset, generate a wordcloud. What are some terms that seem to be emphasized here?
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Step II: Prediction (20 points)
+### I. Create a multiple regression model with the outcome variable price.
+#### A. Describe your process. How did you wind up including the independent variables that you kept, and discarding the ones that you didn’t keep? In a narrative of at least two paragraphs, discuss your process and your reasoning. In the write-up, be sure to talk about how you evaluated the quality of your model.
+
+
+
+
+
+
+
+#### B. Show a screenshot of your regression summary, and explain the regression equation that it generated.
+1. What is the r-squared of your model? What does this mean?
+2. What is the RMSE of your model? What does this mean?
+
+
+
+
+
+
+
+## Step III: Classification (40 points)
+### Part I. Using k-nearest neighbors, predict the type of cancellation policy that a rental unit in your neighborhood will have. Use any set of numerical predictors in order to build this model. Youdonothavetojustacceptthelevelsofthisfactor“asis”--inotherwords,you may wish to explore with combinations, modifications, etc.
+#### A. Show the code you used to run your model, and the code you used to assess your model.
+    
+#### B. Write a two-paragraph narrative that describes how you did this. In your narrative, be sure to describe your predictor choices, and mention how you arrived at the particular k value that you used.
+
+
+
+### Classification, Part II. Naive Bayes
+#### A. Using any set of predictors, build a model using the naive Bayes algorithm, with the purpose of predicting whether a particular rental will be instantly bookable.
+#### B. Describe a fictional apartment, and use your model to predict which bin it will fall into.
+#### C. Show a screenshot of the code you used to build your model, the code you used to run the algorithm, and code you used to assess the algorithm.
+#### D. Write a two-paragraph narrative that describes how you did this. In your narrative, be sure to talk about things like factor selection and testing against your training data.
+
+
+
+### Classification, Part III. Classification Tree
+#### A. Build a classification tree that predicts the size of the cleaning fee that a particular rental will have. Before you can do this, bin the cleaning fees into groups (one of your groups can be “No Fee”).
+#### B. Determine the ideal size of your tree using cross-validation.
+#### C. Usingrpart.plotandyourchoiceofgraphicalparameters,showyourtree model here.
+#### D. In a 1-2 paragraph write-up, describe your process. Talk about some of the features that you considered using, and your reasons why. Mention anything that you found interesting as you explored various possible models, and the process you used to arrive at the model you finished with.
+
+
+
+
+## Step IV: Clustering (15 points)
+### I. Perform either a k-means analysis or a hierarchical clustering analysis in order to place rentals within your neighborhood into clusters.
+** Of any section of the project, this one offers the most opportunity to be creative andtakerisks. Thinkaboutfeatureengineering,too--how/when/wherecanyou create new variables based on existing ones?
+   
+### II. Show your code and results, and name each of your clusters. In 1-2 paragraphs, describe the process that you used.
+
+
+
+
+
+
+
+
+## Step V: Conclusions (10 points)
+### I. Write a 3-5 paragraph summary that describes your overall process and experience with this assignment. How could these findings be useful? Who could benefit from the data mining that you have performed here? You already summarized your specific steps in some other parts of the write-up, so focus on the big picture here (do not not use the conclusion to simply describe everything you did in the other parts).
+Submit your final report as a PDF to Blackboard before the deadline listed on the assignment.
+Also: Upload the R Script(s) that you used to generate your results.
