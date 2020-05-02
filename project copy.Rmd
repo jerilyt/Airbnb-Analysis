@@ -1,0 +1,421 @@
+---
+title: "Project"
+author: "Team"
+date: "4/19/2020"
+output: html_document
+---
+
+
+
+## Step II: Prediction (20 points)
+### I. Create a multiple regression model with the outcome variable price.
+### A. Describe your process. How did you wind up including the independent variables that you kept, and discarding the ones that you didn’t keep? In a narrative of at least two paragraphs, discuss your process and your reasoning. In the write-up, be sure to talk about how you evaluated the quality of your model.
+
+
+
+#### Data Preparation for Linear Regression Modeling
+
+
+**1. Missing Value Imputation**
+
+square_feet
+```{r}
+PB_lm = PB_3
+#summary(PB_lm$square_feet)  # there is too many missing value, therefore, I delete it in 3.(2) part.
+PB_lm$square_feet[is.na(PB_lm$square_feet) == T] <- "N/A"
+PB_lm$square_feet <-as.factor(PB_lm$square_feet)
+```
+
+security_deposit
+I assumed security_deposit is 0 if there is no information about security deposit
+```{r}
+#summary(PB_lm$security_deposit)
+PB_lm$security_deposit[is.na(PB_lm$security_deposit)] <- 0
+
+```
+
+cleaning_fee. I assumed cleaning_fee. is 0 if there is no information about the fee
+```{r}
+#summary(PB_lm$cleaning_fee)
+PB_lm$cleaning_fee[is.na(PB_lm$cleaning_fee)] <- 0
+```
+
+reviews
+```{r}
+# review_scores_rating, review_scores_accuracy, review_scores_cleanliness, review_scores_checkin, review_scores_communication, review_scores_location,  review_scores_value
+
+# no_review_data = PB_lm[is.na(PB_lm$review_scores_accuracy) == T,]
+review_cols = c("review_scores_rating", "review_scores_accuracy", "review_scores_cleanliness", "review_scores_checkin", "review_scores_communication", "review_scores_location",  "review_scores_value")
+for (i in review_cols){
+        PB_lm[i][is.na(PB_lm[i]) == T] = median(PB_lm[,i],na.rm = T)
+}
+
+# reviews_per_month
+PB_lm$reviews_per_month[is.na(PB_lm$reviews_per_month) == T] = 0
+#summary(PB_lm$reviews_per_month)
+
+PB_lm$first_review  = as.factor(PB_lm$first_review)
+#summary(PB_lm)
+
+```
+
+
+
+**2. Feature Engineering**
+property_type  {Apartment}, {Other}
+```{r}
+#summary(as.factor(PB_lm$property_type))
+PB_lm$property_type[PB_lm$property_type != "Apartment"] <- "Other"
+PB_lm$property_type <- droplevels(PB_lm$property_type)
+#summary(as.factor(PB_lm$property_type))
+```
+
+weekly_price and monthly_price
+*In this step, we can not use the exact number from weekly_price and monthly_price. Because the two prices are calculated after we decide the daily price. However, we can measure whether the airbnb provide the discount or not. If providing, we use the value as "offer discount", and if not, the value will be "no discount"*
+```{r}
+# weekly_price
+# offer high discount or not
+#summary(PB_lm$weekly_price)
+for (i in 1:length(PB_lm$weekly_price)) {
+        if (is.na(PB_lm$weekly_price[i]) == T){
+                PB_lm$weekly_price[i] = PB_lm$price[i]*7
+        }
+}
+
+weekly_discount_ratio = (PB_lm$weekly_price)/(PB_lm$price*7)
+weekly_discount_ratio[is.na(weekly_discount_ratio) == T] = 1
+#summary(weekly_discount_ratio)
+for (i in 1:length(weekly_discount_ratio)){
+        if (weekly_discount_ratio[i] < 1 ){
+                PB_lm$weekly_price[i] = "offer discount"
+        }
+        else{
+                PB_lm$weekly_price[i] = "no discount"
+        }
+}
+PB_lm$weekly_price = as.factor(PB_lm$weekly_price)
+#summary(PB_lm$weekly_price)
+
+# monthly_price
+#summary(PB_lm$monthly_price)
+for (i in 1:length(PB_lm$monthly_price)) {
+        if (is.na(PB_lm$monthly_price[i]) == T){
+                PB_lm$monthly_price[i] = PB_lm$price[i]*30
+        }
+}
+
+monthly_discount_ratio = (PB_lm$monthly_price)/(PB_lm$price*30)
+monthly_discount_ratio[is.na(monthly_discount_ratio) == T] = 1
+#summary(monthly_discount_ratio)
+for (i in 1:length(monthly_discount_ratio)){
+        if (monthly_discount_ratio[i] < 1 ){
+                PB_lm$monthly_price[i] = "offer discount"
+        }
+        else{
+                PB_lm$monthly_price[i] = "no discount"
+        }
+}
+PB_lm$monthly_price = as.factor(PB_lm$monthly_price)
+#summary(PB_lm$monthly_price)
+
+```
+
+calendar_updated
+```{r}
+library(stringr)
+# calendar_updated
+#summary(PB_lm$calendar_updated)
+calendar_updated = gsub(" ago","",PB_lm$calendar_updated)
+calendar_updated = gsub("weeks","week",calendar_updated)
+calendar_updated_day = c()
+#summary(as.factor(calendar_updated))
+# length(PB_lm$calendar_updated)
+for(i in 1:length(PB_lm$calendar_updated)){
+        if (str_detect(calendar_updated[i],"week") == T){
+                number =gsub(" week","" ,calendar_updated[i])
+                if (number == "a"){
+                        number = "1"
+                }
+                number = as.numeric(number)*7
+        }
+        if (str_detect(calendar_updated[i],"months") == T){
+                number =gsub(" months","" ,calendar_updated[i])
+                number = as.numeric(number)*30
+        }
+        if (str_detect(calendar_updated[i],"today") == T){
+                number =gsub("today","1" ,calendar_updated[i])
+                number = as.numeric(number)
+        }
+        if (str_detect(calendar_updated[i],"yesterday") == T){
+                number =gsub("yesterday","2" ,calendar_updated[i])
+                number = as.numeric(number)
+        }
+        if (str_detect(calendar_updated[i],"days") == T){
+                number =gsub(" days","" ,calendar_updated[i])
+                number = as.numeric(number)
+        }        
+        if (str_detect(calendar_updated[i],"never") == T){
+                number =gsub("never","10000" ,calendar_updated[i])   
+                number = as.numeric(number)
+        }       # 10000 is a sign, we will replace it by the maximized calendar updated day
+        calendar_updated_day = c(calendar_updated_day,number)
+        
+}
+calendar_updated_day[calendar_updated_day == 10000] = calendar_updated_day[max(calendar_updated_day[calendar_updated_day<10000])]
+#summary(calendar_updated_day)
+PB_lm$calendar_updated = calendar_updated_day
+
+#summary(PB_lm)
+```
+
+
+
+
+**3. Feature Selection**
+
+**(1) drop useless variables**
+```{r}
+PB_lm = subset(PB_lm,select =- c(id,name,summary,description,neighborhood_overview,notes,host_verifications,
+                                latitude,longitude,transit,access,interaction,house_rules,
+                                host_id,host_name,host_about,amenities))
+# summary(PB_lm)
+```
+
+**(2) Delect the feature whose primary value ratio over 80%**
+When the primary value ratio is over a critical level, the feature has less predictable ability.
+```{r}
+#tmp = PB_lm
+RowNumber = nrow(PB_lm)
+cols = colnames(PB_lm)
+Primary_Value_Ratio = c()
+for (i in cols){
+        Primary_Value_Ratio = c(Primary_Value_Ratio,max(table(PB_lm[i]))/RowNumber)
+}
+Primary_Value = data.frame(cols,Primary_Value_Ratio)
+Primary_Value[Primary_Value$Primary_Value_Ratio>0.8,]
+
+PB_lm = select(PB_lm,-Primary_Value[Primary_Value$Primary_Value_Ratio>0.8,]$cols)
+```
+
+
+**Spliting Dataset**
+*In the following steps, we might use the informatin from validation dataset. For example, we use the dataset to measure the correaltions between each features. To avoid information leakage, I split dataset in this step*
+```{r}
+set.seed(100)
+newPB_lm <- sample_n(PB_lm, n())
+bp <- nrow(newPB_lm)*0.6
+train_data <- slice(newPB_lm,1:bp)
+valid_data <- slice(newPB_lm,(bp+0.0001):nrow(newPB_lm))
+```
+
+**(3) High Correlation Detection**
+```{r}
+cols = colnames(train_data)
+numeric_cols = c()
+for(i in cols){
+        if ((class(train_data[,i]) == "numeric")|(class(train_data[,i]) == "integer")){
+            numeric_cols = c(numeric_cols,i)    
+        }
+}
+train_data_Numeric = select(train_data,numeric_cols)
+#View(train_data_Numeric)
+cormat <- cor(train_data_Numeric)
+head(cormat)
+
+
+library(reshape2)
+melted_cormat <- melt(cormat)
+head(melted_cormat)
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "lightblue3", high = "salmon", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 9, hjust = 1))+
+ coord_fixed()
+# Print the heatmap
+print(ggheatmap)
+#View(cormat>0.7)
+```
+
+3 pairs of variables with high correlation(larger than 0.7):
+* **host_total_listings_count** & **host_listings_count** & **calculated_host_listings_count**
+* **accommodates** & **beds** 
+* **availability_30** & **availability_60** & **availability_90**
+
+```{r}
+View(cormat[6,])
+```
+
+
+To avoid multicollinearity, to decide to remove the following varibles:**host_listings_count**, **host_total_listings_count**, **beds**, **availability_30** and **availability_60**
+
+```{r}
+#tmp_train = train_data
+#tmp_valid = valid_data
+high_cor_cols = c("host_listings_count","host_total_listings_count","beds","availability_30", "availability_60")
+train_data = select(train_data,-high_cor_cols)
+valid_data = select(valid_data,-high_cor_cols)
+```
+
+
+
+
+
+**(4) Skewness of Dependent Variable**
+```{r}
+cols = colnames(train_data)
+numeric_cols = c()
+for(i in cols){
+        if ((class(train_data[,i]) == "numeric")|(class(train_data[,i]) == "integer")){
+            numeric_cols = c(numeric_cols,i)    
+        }
+}
+n_row = nrow(train_data)
+ # Histogram overlaid with kernel density curve
+ggplot(train_data, aes(x=price)) + 
+        geom_histogram(aes(y=..density..),      # Histogram with density instead of count on y-axis
+                       binwidth=.5,
+                       bins = 10,
+                       colour="black", fill="white") +
+        geom_density(alpha=.2, fill="#FF6666")  # Overlay with transparent density plot
+```
+* Price follows right-skewed Distribution. It is a common phenomenon for most real-life variables. 
+* However, for linear regression model, it is essential for residual of the model to follow normal distribution. And then the response variable will also follow. 
+* Here we use log transformation to make response variable into normal distribution. The new repsonce variable should be log(price). For log transforming, the data point which price is 0 should be deleted. 
+* In addition,3 data points seem to be outliers. These prices are over 1000 dollars for one night. We can not deny their existance. However, we should delete them to generalize our model.
+
+
+```{r}
+
+train_data3 = train_data[(train_data$price != 0)&(train_data$price < 1000),]
+train_data3$log_price = log(train_data3$price)
+train_data3 = select(train_data3 , -price)
+# summary(train_data3$log_price)
+
+ggplot(train_data3, aes(x=log_price)) + 
+        geom_histogram(aes(y=..density..),      # Histogram with density instead of count on y-axis
+                       binwidth=.5,
+                       bins = 10,
+                       colour="black", fill="white") +
+        geom_density(alpha=.2, fill="#FF6666")  # Overlay with transparent density plot
+
+```
+
+
+
+
+
+
+
+
+
+**4. Modeling**
+
+**(1) Build a initial model**
+```{r}
+# Build the initial model
+lm_1 <- lm(log_price ~., data = train_data3)
+
+lendfitback <- step(lm_1,direction = "backward")
+summary(lendfitback)
+```
+
+
+**(2) Detecting Multicollinearity**
+```{r}
+library(car)
+vif(lendfitback,digits = 3)
+```
+# VIF values of neighbourhood_cleansed, zipcode, first_review are large, which indicates that there is significant Multicollinearity problem with 3 features. Therefore, we delete them and rebuild a new model.
+
+
+**(3) build a second model w/o 3 multicollinearity features**
+
+```{r}
+# Build the second model
+lm_2 <- lm(log_price ~. - neighbourhood_cleansed - zipcode-first_review, data = train_data3)
+
+lendfitback_2 <- step(lm_2,direction = "backward")
+summary(lendfitback_2)
+```
+
+**(4) Check VIF again**
+```{r}
+vif(lendfitback_2,digits = 3) #Check again
+```
+
+
+**(5) Residual Analysis**
+
+```{r}
+plot(lendfitback_2)
+```
+
+Residual Plot 1: **Resuduals vs. Fitted**. Even though residuals of some outliers over the range of [-2,2], most of data points randomly distributes around 0. This model fits the data well
+Residual Plot 2: **Normal Q_Q Plot**. Some data points deviate from the diagonal, so residuals do not follow normal distribution strictly. 
+Residual Plot 3: **Scale-Location**. Seem to be constant with no trend. There is no serious problem in Heteroskedasticity.
+
+
+Residual Independence Analysis: In Durbin Watson Test, the p-value is larger than 0.05, we can assume errors are independent.
+```{r}
+durbinWatsonTest(lendfitback_2)
+```
+
+
+In conclusion, the residuals can be regarded as stochastic error.
+
+
+**5. Prediction in valid dataset**
+```{r}
+valid_data$log_price = log(valid_data$price)
+
+# Make predictions
+predictions_train <-  predict(lendfitback_2,train_data3)
+predictions_valid <-  predict(lendfitback_2,valid_data)
+
+# Model performance
+summary(lendfitback_2)
+library(forecast)
+accuracy(predictions_train,train_data3$log_price)
+accuracy(predictions_valid,valid_data$log_price)
+```
+
+
+
+
+#### B. Show a screenshot of your regression summary, and explain the regression equation that it generated.
+
+1. What is the r-squared of your model? What does this mean?
+
+
+* The adjusted r-squared is only 0.5277. This means only 52.77% variation has been explained by the multiple regression model. 
+* In general, the higher the R-squared, the better the model fits your data. Even though the R-squared is not closing to 1, we also can infer the sample data are well correspond to the fitted (assumed) model. In fact, R-squared doesn’t tell us the entire story. After we check the residual plots, we know the residuals independent and identically distributed in normal distribution. That is, this model fits the data well.
+
+
+2. What is the RMSE of your model? What does this mean?
+
+* In valid dataset, RMSE is 0.4206808. The standard deviation of the predictions from the actual values in valid dataset would be 0.4206808. 
+* What's more, RMSE in training dataset is 0.3775776. The difference between these two number is small. This tells us the model is good-fit and has generalization ability. The model has the ability to adapt properly to new, previously unseen data, drawn from the same distribution as the one used to create the model.
+
+
+3. Conclusion
+* Considering the reasons why value missing would be helpful for us to fill the blank
+* It is necesasary to remove the weekly_price and monthly_price. Replaced the values of weekly_price by whether offering the weekly discount or not. This is because the two prices only can be decided after the host know the daily price. 
+* Feature engineering and feature selection are useful to better represent the underlying problem to the predictive models, resulting in improved model accuracy on unseen data.
+* Use R-squred value, RMSE and residual analysis to measure model's goodness of fit. 
+* There are some significant predictors such as **minimum_nights**, **host_response_timewithin an hour**, **room_type**, **cleaning_fee**, **review_scores_cleanliness**. These features make great effects on our prediction.
+
+
+
+
+
+
+
+
+
+
+
+
