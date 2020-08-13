@@ -60,7 +60,7 @@ PB_lm = select(PB_lm,-Primary_Value[Primary_Value$Primary_Value_Ratio>0.8,]$cols
 
 Correlation analysis is a statistical method used to evaluate the strength of relationship between two quantitative variables. A high correlation means that two or more variables have a strong relationship with each other, while a weak correlation means that the variables are hardly related. In linear regression model, one model assumption is that variables should be independent of one another. Otherwises, one variable will be explained by other. 
 
-![images](correlation.png)
+![images](https://github.com/jerilyt/Airbnb-Analysis/tree/master/images/correlation.png)
 
 #### 3. Skewness of Dependent Variable
 
@@ -102,19 +102,19 @@ plot(lendfitback_2)
 
 Even though residuals of some outliers over the range of [-2,2], most of data points randomly distributes around 0. This model fits the data well
 
-![images](Resuduals_vs._Fitted.png)
+![images](https://github.com/jerilyt/Airbnb-Analysis/tree/master/images/Resuduals_vs._Fitted.png)
 
 ##### Normal Q_Q Plot
 
 Some data points deviate from the diagonal, so residuals do not follow normal distribution strictly. 
 
-![images](Normal_QQ_Plot.png)
+![images](https://github.com/jerilyt/Airbnb-Analysis/tree/master/images/Normal_QQ_Plot.png)
 
 ##### Scale-Location
 
 Seem to be constant with no trend. There is no serious problem in Heteroskedasticity.
 
-![images](Scale-Location.png)
+![images](https://github.com/jerilyt/Airbnb-Analysis/tree/master/images/Scale-Location.png)
 
 ##### Residual Independence
 
@@ -130,7 +130,7 @@ In Durbin Watson Test, the p-value is larger than 0.05, we can assume errors are
 
 After we check the residuals, we know the model is satisfied OLS assumptions. And we use the model to predict on validation dataset.
 
-![images](summary.png)
+![images](https://github.com/jerilyt/Airbnb-Analysis/tree/master/images/summary.png)
 
 The adjusted r-squared is only 0.5277. This means only 52.77% variation has been explained by the multiple regression model. In general, the higher the R-squared, the better the model fits your data. Even though the R-squared is not closing to 1, we also can infer the sample data are well correspond to the fitted (assumed) model. In fact, R-squared doesn’t tell us the entire story. After we check the residual plots, we know the residuals independent and identically distributed in normal distribution. That is, this model fits the data well.
 
@@ -143,7 +143,7 @@ In valid dataset, RMSE is 0.4206808. The standard deviation of the predictions f
 **Please let me know if there is something I should add. And if you enjoy it, share it with your friends and colleagues : )**
 
 **另外博客的中文版本也会及时更新的！谢谢！**
-
+博客地址：https://jerilyt.github.io/yantongtt.github.io/
 
 
 
